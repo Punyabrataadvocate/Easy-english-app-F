@@ -24,7 +24,8 @@ import {
   Info,
   HelpCircle,
   Smartphone,
-  ChevronDown
+  ChevronDown,
+  Copy
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import confetti from "canvas-confetti";
@@ -180,6 +181,17 @@ export function LanguageBridge() {
   const [profTrans, setProfTrans] = useState("");
   const [natTrans, setNatTrans] = useState("");
   const [pronouncTip, setPronouncTip] = useState("");
+  const [showNuances, setShowNuances] = useState(false);
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  const handleCopy = (text: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedText(text);
+    setTimeout(() => {
+      setCopiedText(null);
+    }, 2000);
+  };
   
   // Custom Speech Engine & Audio state
   const [isTranslatorListening, setIsTranslatorListening] = useState(false);
@@ -771,87 +783,143 @@ export function LanguageBridge() {
                   {/* Results grid container in pure premium white */}
                   <div className="bg-white border border-[#E5E7EB] rounded-3xl p-5 space-y-4 shadow-xl text-zinc-800">
                     <div className="flex items-center justify-between pb-2 border-b border-[#F3F4F6]">
-                      <span className="text-[10.5px] text-zinc-500 font-extrabold uppercase tracking-wider block">Smart English Enhancement</span>
+                      <span className="text-[10.5px] text-zinc-500 font-extrabold uppercase tracking-wider block">Translation Results</span>
                       <span className="text-[10px] text-[#7C3AED] font-black bg-[#F5F3FF] border border-[#DDD6FE] px-2.5 py-0.5 rounded-full flex items-center gap-1">
                         <Sparkles className="w-2.5 h-2.5 text-[#7C3AED] animate-pulse" />
-                        Aesthetic VANI Output
+                        VANI English Output
                       </span>
                     </div>
 
-                    {/* Simple Direct option */}
-                    <div className="bg-gray-50/75 border border-gray-200/85 p-3.5 rounded-2xl relative flex flex-col gap-1 transition hover:bg-gray-100/50 w-full text-left">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9.5px] font-black tracking-widest text-[#7C3AED] uppercase">🔤 Direct Version</span>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => speakAloud(directTrans, "direct")}
-                            className={`p-1.5 rounded-md transition ${ttsPlaying === "direct" ? "bg-purple-100 text-[#7C3AED] animate-pulse" : "bg-gray-200 hover:bg-gray-300 text-gray-700 hover:text-black"}`}
-                            title="Hear spoken English"
-                          >
-                            <Volume2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                      <p className="text-sm font-semibold text-[#1F2937] leading-normal mt-1 pr-6 transition">
-                        "{directTrans}"
-                      </p>
-                    </div>
-
-                    {/* Professional elite option */}
-                    <div className="bg-gray-50/75 border border-gray-200/85 p-3.5 rounded-2xl relative flex flex-col gap-1 transition hover:bg-gray-100/50 w-full text-left">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9.5px] font-black tracking-widest text-[#0369A1] uppercase">💼 Professional English</span>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => speakAloud(profTrans, "professional")}
-                            className={`p-1.5 rounded-md transition ${ttsPlaying === "professional" ? "bg-sky-100 text-[#0369A1] animate-pulse" : "bg-gray-200 hover:bg-gray-300 text-gray-700 hover:text-black"}`}
-                            title="Hear professional English"
-                          >
-                            <Volume2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                      <p className="text-sm font-semibold text-[#1F2937] leading-normal mt-1 pr-6">
-                        "{profTrans}"
-                      </p>
-                    </div>
-
-                    {/* Natural English option */}
-                    <div className="bg-[#FAF5FF] border border-purple-200 p-4 rounded-2xl relative flex flex-col gap-1 transition-all overflow-hidden shadow-sm">
-                      <div className="absolute right-[-4px] top-[-4px] w-12 h-12 rounded-full bg-purple-100 filter blur-lg" />
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9.5px] font-black tracking-widest text-[#7C3AED] uppercase flex items-center gap-1">
-                          <Sparkles className="w-2.5 h-2.5" />
-                          Natural Native-Speaker Version
+                    {/* Primary Simple English Translation Hero block */}
+                    <div className="bg-purple-950 text-white rounded-2xl p-5 shadow-lg relative overflow-hidden flex flex-col gap-2">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 rounded-full blur-xl pointer-events-none" />
+                      <div className="flex items-center justify-between pb-2 border-b border-purple-800/40">
+                        <span className="text-[10px] font-black tracking-widest text-purple-300 uppercase flex items-center gap-1">
+                          <Languages className="w-3.5 h-3.5 text-purple-300" /> English Translation
                         </span>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
                           <button
-                            onClick={() => speakAloud(natTrans, "natural")}
-                            className={`p-1.5 rounded-md transition ${ttsPlaying === "natural" ? "bg-purple-200 text-[#7C3AED] animate-pulse" : "bg-purple-100 text-[#7C3AED] hover:bg-purple-200"}`}
-                            title="Hear fluent English"
+                            onClick={() => speakAloud(natTrans || directTrans, "natural")}
+                            className={`p-1.5 rounded-lg transition-all ${
+                              ttsPlaying === "natural" 
+                                ? "bg-purple-800 text-white animate-pulse" 
+                                : "bg-purple-900/60 hover:bg-purple-800 text-purple-200 hover:text-white"
+                            }`}
+                            title="Hear translation spoken"
                           >
-                            <Volume2 className="w-3.5 h-3.5" />
+                            <Volume2 className="w-4 h-4" />
+                          </button>
+                          
+                          <button
+                            onClick={() => handleCopy(natTrans || directTrans)}
+                            className="p-1.5 rounded-lg bg-purple-900/60 hover:bg-purple-800 text-purple-200 hover:text-white transition-all"
+                            title="Copy to clipboard"
+                          >
+                            {copiedText === (natTrans || directTrans) ? (
+                              <span className="text-[10.5px] font-bold text-emerald-400 px-1">Copied!</span>
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
                           </button>
                         </div>
                       </div>
-                      <p className="text-base font-extrabold text-[#111827] leading-relaxed mt-1.5">
-                        "{natTrans}"
+                      
+                      <p className="text-base font-extrabold leading-relaxed text-white mt-1 pr-4 select-text">
+                        "{natTrans || directTrans}"
                       </p>
 
                       {/* Launch practice option for this translation */}
-                      <div className="mt-3.5 pt-3 border-t border-purple-100 flex items-center justify-between">
-                        <span className="text-[10.5px] text-zinc-650 text-gray-700 font-bold flex items-center gap-1.5">
-                          <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                          Ready to practice? Let's check pitch!
+                      <div className="mt-3.5 pt-3 border-t border-purple-800/40 flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[10.5px] text-purple-300 font-bold flex items-center gap-1.5">
+                          <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+                          Practice Pronunciation:
                         </span>
                         <button
-                          onClick={() => startCoachVoiceRecognition(natTrans)}
-                          className="px-3.5 py-1.5 bg-[#BD53F4] text-white hover:bg-[#8B2FC9] transition-all rounded-lg text-xs font-extrabold uppercase tracking-wide flex items-center gap-1 scale-95 active:scale-95 shadow-sm shadow-purple-200"
+                          onClick={() => startCoachVoiceRecognition(natTrans || directTrans)}
+                          className="px-3.5 py-1.5 bg-[#BD53F4] text-white hover:bg-[#8B2FC9] transition-all rounded-lg text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 active:scale-95 shadow-md shadow-purple-950/20"
                         >
-                          <Mic className="w-3.5 h-3.5" />
-                          <span>Practice Pronunciation</span>
+                          <Mic className="w-3 h-3" />
+                          <span>Check My Accent</span>
                         </button>
                       </div>
+                    </div>
+
+                    {/* Beautiful, simple expander for additional stylized variants */}
+                    <div className="border border-gray-100 rounded-2xl overflow-hidden">
+                      <button
+                        onClick={() => setShowNuances(!showNuances)}
+                        className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-[11px] font-black text-gray-700 transition uppercase tracking-wider"
+                      >
+                        <span className="flex items-center gap-1.5 text-[#7C3AED]">
+                          <Sparkles className="w-3.5 h-3.5 text-[#7C3AED]" />
+                          <span>Advanced Styles & Tones</span>
+                        </span>
+                        <span>{showNuances ? "▲ Hide Styles" : "▼ Show More Styles"}</span>
+                      </button>
+
+                      {showNuances && (
+                        <div className="p-3 bg-gray-50/40 border-t border-gray-100 space-y-3">
+                          {/* Simple Direct option */}
+                          <div className="bg-white border border-gray-200 p-3.5 rounded-xl flex flex-col gap-1 text-left relative">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-black tracking-wider text-purple-700 uppercase">🔤 Literal Direct Version</span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => speakAloud(directTrans, "direct")}
+                                  className={`p-1 rounded transition ${ttsPlaying === "direct" ? "bg-purple-100 text-[#7C3AED] animate-pulse" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`}
+                                  title="Hear spoken English"
+                                >
+                                  <Volume2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleCopy(directTrans)}
+                                  className="p-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-500 transition"
+                                  title="Copy literal translation"
+                                >
+                                  {copiedText === directTrans ? (
+                                    <span className="text-[9px] font-bold text-emerald-600">Copied</span>
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                            <p className="text-xs font-semibold text-gray-800 leading-normal pr-4">
+                              "{directTrans}"
+                            </p>
+                          </div>
+
+                          {/* Professional elite option */}
+                          <div className="bg-white border border-gray-200 p-3.5 rounded-xl flex flex-col gap-1 text-left relative">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-black tracking-wider text-sky-700 uppercase">💼 Corporate / Formal Style</span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => speakAloud(profTrans, "professional")}
+                                  className={`p-1 transition ${ttsPlaying === "professional" ? "bg-sky-100 text-[#0369A1] animate-pulse" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`}
+                                  title="Hear professional English"
+                                >
+                                  <Volume2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleCopy(profTrans)}
+                                  className="p-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-500 transition"
+                                  title="Copy formal translation"
+                                >
+                                  {copiedText === profTrans ? (
+                                    <span className="text-[9px] font-bold text-emerald-600">Copied</span>
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                            <p className="text-xs font-semibold text-gray-800 leading-normal pr-4">
+                              "{profTrans}"
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Pronunciation & Usage Pitfalls coach tip */}

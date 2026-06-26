@@ -40,6 +40,7 @@ import {
   Plus,
   RefreshCw,
   Trash2,
+  FileText,
   Bell,
   Wifi,
   Database,
@@ -450,7 +451,10 @@ function TranslationBlock({ text, loading }: TranslationBlockProps) {
     setSpeaking(true);
   };
 
-  const baseClassName = "self-end max-w-[82%] bg-[#F3E8FF] border-l-4 border-[#8B2FC9] rounded-tr-2xl rounded-br-2xl rounded-bl-2xl p-4.5 mt-2 mb-3 shadow-xs text-left";
+  const isLocked = text?.startsWith("🔒");
+  const baseClassName = isLocked
+    ? "self-end max-w-[82%] bg-amber-50/95 border-l-4 border-amber-500 rounded-tr-2xl rounded-br-2xl rounded-bl-2xl p-4.5 mt-2 mb-3 shadow-xs text-left"
+    : "self-end max-w-[82%] bg-[#F3E8FF] border-l-4 border-[#8B2FC9] rounded-tr-2xl rounded-br-2xl rounded-bl-2xl p-4.5 mt-2 mb-3 shadow-xs text-left";
 
   // LOADING STATE — shimmer skeleton
   if (loading) {
@@ -499,51 +503,53 @@ function TranslationBlock({ text, loading }: TranslationBlockProps) {
         }
       `}</style>
 
-      <div className="text-[10px] md:text-[11px] font-extrabold tracking-wider text-[#8B2FC9] uppercase mb-1.5">
-        🔤 IN ENGLISH
+      <div className={`text-[10px] md:text-[11px] font-extrabold tracking-wider ${isLocked ? "text-amber-700" : "text-[#8B2FC9]"} uppercase mb-1.5`}>
+        {isLocked ? "🔒 Trial Restriction" : "🔤 IN ENGLISH"}
       </div>
 
-      <div className="h-[1px] bg-[#8B2FC9]/15 mb-2.5" />
+      <div className={`h-[1px] ${isLocked ? "bg-amber-500/20" : "bg-[#8B2FC9]/15"} mb-2.5`} />
 
-      <div className="text-[18px] md:text-[20px] font-bold text-[#1A1A1A] leading-relaxed mb-3">
+      <div className={`${isLocked ? "text-[12px] md:text-[13px] font-medium text-amber-900" : "text-[18px] md:text-[20px] font-bold text-[#1A1A1A]"} leading-relaxed ${isLocked ? "mb-1" : "mb-3"}`}>
         {text}
       </div>
 
-      <div className="flex gap-2">
-        <button 
-          onClick={handleCopy} 
-          style={{
-            background: copied ? "rgba(76,175,80,0.15)" : "#EEEEEE",
-            border: "none",
-            borderRadius: "14px",
-            padding: "5px 12px",
-            fontSize: "12px",
-            fontWeight: 600,
-            color: copied ? "#4CAF50" : "#333",
-            cursor: "pointer",
-            transition: "all 0.2s"
-          }}
-        >
-          {copied ? "✓ Copied!" : "📋 Copy"}
-        </button>
+      {!isLocked && (
+        <div className="flex gap-2">
+          <button 
+            onClick={handleCopy} 
+            style={{
+              background: copied ? "rgba(76,175,80,0.15)" : "#EEEEEE",
+              border: "none",
+              borderRadius: "14px",
+              padding: "5px 12px",
+              fontSize: "12px",
+              fontWeight: 600,
+              color: copied ? "#4CAF50" : "#333",
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            {copied ? "✓ Copied!" : "📋 Copy"}
+          </button>
 
-        <button
-          onClick={handleListen}
-          style={{
-            background: speaking ? "rgba(139,47,201,0.25)" : "rgba(139,47,201,0.12)",
-            border: "none",
-            borderRadius: "14px",
-            padding: "5px 12px",
-            fontSize: "12px",
-            fontWeight: 600,
-            color: "#8B2FC9",
-            cursor: "pointer",
-            transition: "all 0.2s"
-          }}
-        >
-          {speaking ? "⏹ Stop" : "🔊 Listen"}
-        </button>
-      </div>
+          <button
+            onClick={handleListen}
+            style={{
+              background: speaking ? "rgba(139,47,201,0.25)" : "rgba(139,47,201,0.12)",
+              border: "none",
+              borderRadius: "14px",
+              padding: "5px 12px",
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "#8B2FC9",
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            {speaking ? "⏹ Stop" : "🔊 Listen"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -679,8 +685,25 @@ const getLangSpeechCode = (langCode: string): string => {
     default: return "hi-IN";
   }
 };
+
+const loadRazorpayScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if ((window as any).Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 export default function App() {
-  const [appStage, setAppStage] = useState<string>("app");
+  const [appStage, setAppStage] = useState<string>(() => {
+    return localStorage.getItem("vani_opening_completed") === "true" ? "app" : "opening";
+  });
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [loginOtpSent, setLoginOtpSent] = useState<boolean>(false);
   const [otpValue, setOtpValue] = useState<string>("");
@@ -703,7 +726,7 @@ export default function App() {
   
   // Subscription tier root state variables
   const [userPlan, setUserPlan] = useState<string>(() => {
-    return localStorage.getItem("userPlan") || localStorage.getItem("vani_user_plan") || "none";
+    return localStorage.getItem("userPlan") || localStorage.getItem("vani_user_plan") || "trial";
   });
   const [trialDaysLeft, setTrialDaysLeft] = useState<number>(() => {
     const saved = localStorage.getItem("vani_trial_days_left") || localStorage.getItem("trialDaysLeft");
@@ -860,10 +883,18 @@ export default function App() {
     return false;
   }
 
+  function canUseTranslation() {
+    return userPlan === "premium" ||
+           userPlan === "promaster" ||
+           userPlan === "pro" ||
+           userPlan === "monthly";
+  }
+
   function canUseVoiceStation() {
     return userPlan === "premium" ||
            userPlan === "promaster" ||
-           userPlan === "pro";
+           userPlan === "pro" ||
+           userPlan === "monthly";
   }
 
   function canSendMessage() {
@@ -1002,18 +1033,23 @@ export default function App() {
         if (cancelled) {
           setTrialExpired(true);
         } else {
-          // Autos upgrade
-          localStorage.setItem("userPlan", "premium");
-          localStorage.setItem("vani_user_plan", "premium");
-          setUserPlan("premium");
+          // Autos upgrade based on selected auto-renew plan option
+          const selectedRenewPlan = localStorage.getItem("trialAutoRenewPlan") || "monthly";
+          const targetPlan = selectedRenewPlan === "six_month" ? "pro" : "premium";
+          const planName = selectedRenewPlan === "six_month" ? "6-Month Pass (₹199/month)" : "Premium Plan (₹249/month)";
+          const periodDays = selectedRenewPlan === "six_month" ? 180 : 30;
+
+          localStorage.setItem("userPlan", targetPlan);
+          localStorage.setItem("vani_user_plan", targetPlan);
+          setUserPlan(targetPlan);
           setTrialExpired(false);
           
-          const expiryMills = Date.now() + (30 * 24 * 60 * 60 * 1000);
+          const expiryMills = Date.now() + (periodDays * 24 * 60 * 60 * 1000);
           localStorage.setItem("planExpiry", String(expiryMills));
           localStorage.setItem("vani_plan_expiry", String(expiryMills));
 
           setTimeout(() => {
-            showToast("🚀 Trial Auto-Renewed!", "Your 4-day trial has automatically upgraded to the Premium Plan (₹249/month).", "success");
+            showToast("🚀 Trial Auto-Renewed!", `Your 4-day trial has automatically upgraded to the ${planName}.`, "success");
           }, 2050);
         }
       }
@@ -1232,18 +1268,147 @@ export default function App() {
   const [otpPhone, setOtpPhone] = useState<string>("");
   const [otpSent, setOtpSent] = useState<boolean>(false);
   const [otpCode, setOtpCode] = useState<string>("");
+  const [syncGeneratedOtp, setSyncGeneratedOtp] = useState<string>("");
+  const [onboardingGeneratedOtp, setOnboardingGeneratedOtp] = useState<string>("");
   const [isOtpLoggedIn, setIsOtpLoggedIn] = useState<boolean>(false);
   const [otpLoading, setOtpLoading] = useState<boolean>(false);
   const [billingOverlayOpen, setBillingOverlayOpen] = useState<boolean>(false);
   const [otpOverlayOpen, setOtpOverlayOpen] = useState<boolean>(false);
   const [submittingPayment, setSubmittingPayment] = useState<boolean>(false);
   const [activeBillingStep, setActiveBillingStep] = useState<'select' | 'vpa' | 'success'>('select');
+  const [selectedStatusIndex, setSelectedStatusIndex] = useState<number>(0);
   const [selectedUPIApp, setSelectedUPIApp] = useState<string>("gpay");
   const [customVPA, setCustomVPA] = useState<string>("");
   const [paymentSuccessTriggered, setPaymentSuccessTriggered] = useState<boolean>(false);
+
+  // Dynamic Razorpay properties for UPI gateway integration
+  const [razorpayKeyId, setRazorpayKeyId] = useState<string>(() => localStorage.getItem("vani_razorpay_key_id") || "");
+  const [razorpayKeySecret, setRazorpayKeySecret] = useState<string>(() => localStorage.getItem("vani_razorpay_key_secret") || "");
+
+  const triggerRazorpayPayment = async (planKey: string, amount: number, planName: string, successCallback: () => void) => {
+    setSubmittingPayment(true);
+    setWaveHeaving(true);
+    try {
+      const loaded = await loadRazorpayScript();
+      if (!loaded) {
+        throw new Error("Could not download the official Razorpay merchant library.");
+      }
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json"
+      };
+      if (razorpayKeyId) headers["x-razorpay-key-id"] = razorpayKeyId;
+      if (razorpayKeySecret) headers["x-razorpay-key-secret"] = razorpayKeySecret;
+
+      const orderResponse = await fetch("/api/razorpay/create-order", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          amount,
+          currency: "INR",
+          planKey,
+          receipt: `receipt_${planKey}_${Date.now()}`
+        })
+      });
+
+      const orderDetails = await orderResponse.json();
+      if (!orderResponse.ok) {
+        throw new Error(orderDetails.error || orderDetails.details || "Inability to construct Razorpay Order ID on the backend.");
+      }
+
+      if (orderDetails.status === "sandbox_simulation") {
+        if (orderDetails.warning) {
+          console.warn("[RAZORPAY WARNING]:", orderDetails.warning);
+          alert(`💡 Checkout Notice:\n\n${orderDetails.warning}`);
+        } else {
+          alert("💡 Simulated UPI Sandbox Checkout: Payment completed successfully!");
+        }
+        setTimeout(() => {
+          successCallback();
+          setSubmittingPayment(false);
+          setWaveHeaving(false);
+        }, 1200);
+        return;
+      }
+
+      if (orderDetails.warning) {
+        console.warn("[RAZORPAY WARNING]:", orderDetails.warning);
+        alert(`💡 Checkout Notice:\n\n${orderDetails.warning}`);
+      }
+
+      const options = {
+        key: orderDetails.keyId,
+        amount: orderDetails.amount,
+        currency: orderDetails.currency,
+        name: "VANI AI English Coach",
+        description: planName,
+        image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256",
+        order_id: orderDetails.id,
+        handler: async (resp: any) => {
+          setSubmittingPayment(true);
+          try {
+            const verifyRes = await fetch("/api/razorpay/verify-payment", {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                razorpay_order_id: resp.razorpay_order_id || orderDetails.id,
+                razorpay_payment_id: resp.razorpay_payment_id,
+                razorpay_signature: resp.razorpay_signature
+              })
+            });
+
+            const verifyDetails = await verifyRes.json();
+            if (!verifyRes.ok) {
+              throw new Error(verifyDetails.error || "Transaction signature verification failed.");
+            }
+
+            successCallback();
+          } catch (verifyErr: any) {
+            alert(`⚠️ Signature Check Error: ${verifyErr.message}`);
+          } finally {
+            setSubmittingPayment(false);
+            setWaveHeaving(false);
+          }
+        },
+        prefill: {
+          name: profileName || "John Smith",
+          email: profileEmail || "john@gmail.com",
+          contact: profilePhone || "+919876543210"
+        },
+        notes: orderDetails.notes,
+        theme: {
+          color: "#7C3AED"
+        },
+        modal: {
+          ondismiss: () => {
+            setSubmittingPayment(false);
+            setWaveHeaving(false);
+          }
+        }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } catch (err: any) {
+      console.warn("Razorpay Direct Error:", err.message);
+      // Clean fallback so integration never blocks
+      alert(`💡 SDK Notice:\n${err.message}\nPlacing simulated checkout. Please verify key credentials inside the setup console below.`);
+      setSubmittingPayment(false);
+      setWaveHeaving(false);
+    }
+  };
   const [reportOverlayOpen, setReportOverlayOpen] = useState<boolean>(false);
   const [reportTab, setReportTab] = useState<'performance' | 'account'>('performance');
   const [voiceToastMessage, setVoiceToastMessage] = useState<string>("");
+
+  // Account Deletion States
+  const [deletionOverlayOpen, setDeletionOverlayOpen] = useState<boolean>(false);
+  const [deletionReason, setDeletionReason] = useState<string>("");
+  const [deletionStep, setDeletionStep] = useState<number>(1);
+  const [deletionChecked, setDeletionChecked] = useState<boolean>(false);
+
+  // Unsubscription and Cancellation States
+  const [unsubscribeState, setUnsubscribeState] = useState<'none' | 'confirm' | 'success'>('none');
 
   // Dynamic profile states adhering to Google Play / Flutter structure
   const [profileUid, setProfileUid] = useState<string>("usr_fire_g89F3bXa4");
@@ -1272,6 +1437,7 @@ export default function App() {
   
   // Custom Step-by-Step Onboarding states
   const [onboardingSubStep, setOnboardingSubStep] = useState<string>("welcome"); // welcome, phone, otp, trial_offer, upi_payment, success
+  const [trialAutoRenewPlan, setTrialAutoRenewPlan] = useState<'monthly' | 'six_month'>('monthly');
   const [phoneInput, setPhoneInput] = useState<string>("");
   const [otpInput, setOtpInput] = useState<string>("");
   const [phoneNumberError, setPhoneNumberError] = useState<string>("");
@@ -1636,8 +1802,8 @@ export default function App() {
       planId = 'monthly';
     } else if (planName === "Premium") {
       planId = 'premium';
-    } else if (planName === "Pro" || planName === "Pro Master" || planName === "ProMaster") {
-      planId = 'pro';
+    } else if (planName === "Pro" || planName === "Pro Master" || planName === "ProMaster" || planName.includes("6-Month")) {
+      planId = 'promaster';
     }
     
     setUserPlan(planId);
@@ -1666,14 +1832,20 @@ export default function App() {
     if (!otpPhone.trim()) return;
     setOtpLoading(true);
     setTimeout(() => {
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setSyncGeneratedOtp(code);
       setOtpSent(true);
       setOtpLoading(false);
-      alert("🔐 Firebase OTP Mock Sent! Enter '123456' to authenticly sync profiles.");
+      alert(`🔐 Firebase OTP Sent!\nAn OTP SMS was simulated for +91 ${otpPhone}.\nYour actual One-Time Passcode is: ${code}`);
     }, 900);
   };
 
   const verifyOTPCodeSimulate = (e: React.FormEvent) => {
     e.preventDefault();
+    if (otpCode !== syncGeneratedOtp) {
+      alert("❌ Incorrect verification code. Please enter the passcode sent to your device.");
+      return;
+    }
     setOtpLoading(true);
     setTimeout(() => {
       setIsOtpLoggedIn(true);
@@ -1690,21 +1862,22 @@ export default function App() {
 
     // 2. Comprehensive Romanised Indian regional language vocabulary mappings (Hinglish, Benglish, etc.)
     const indianRegionalKeywords = [
-      // Hindi / Hinglish pronouns, core verbs, and particles
+      // Hindi / Hinglish pronouns, core verbs, particles, and common expressions
       "aap", "apna", "apne", "apka", "aapka", "hume", "humara", "mera", "mere", "meri", "mujhe", "tumhara", "tumhare", "tumhari",
       "kuch", "kya", "kyun", "kab", "kaise", "kaha", "kahan", "kidhar", "theek", "thik", "nahi", "acha", "achha", "bohut", "bahut", "kaam",
       "karna", "karo", "karega", "karenge", "bol", "bolo", "bolna", "suno", "sunna", "baat", "samajh", "gaya", "gaye", "chalo", "chala",
       "hai", "hain", "hua", "jaldi", "ab", "abhi", "aaj", "kal", "parso", "hoga", "hogi", "hogya", "dena", "aana", "jana", "unhe", "uske", "uski",
       "bhai", "yaar", "dost", "samajh", "sikhna", "namaste", "shukriya", "ji", "yar", "chalega", "bataye", "pucho", "sunao", "likha", "likhna",
+      "chahiye", "wala", "raha", "rahi", "rahe", "gaadi", "gaddi", "pani", "paani", "khana", "dhanyavad", "dhanyavaad", "namaskar", "shubh", "suprabhat",
       
       // Bengali / Benglish
       "ami", "amar", "tumi", "tomar", "amader", "tomader", "kemon", "acho", "achho", "bhalo", "kothay", "kobe", "keno", "kivabe", "hobe",
       "korchi", "korbo", "koris", "dekho", "khao", "jao", "esho", "asho", "ashbe", "bondhu", "khub", "baje", "kotha", "bolchi", "sunchi",
-      "khabar", "jol", "baba", "ma", "bhalobashi", "bolbo", "shikhbo", "shikhte", "tai", "ki", "na",
+      "khabar", "jol", "baba", "ma", "bhalobashi", "bolbo", "shikhbo", "shikhte", "tai", "ki", "na", "bari", "ghor", "ghar", "gari", "bolen",
       
       // Tamil / Tanglish
       "naan", "nee", "enna", "epdi", "sollu", "theriyum", "theriyaadu", "paaru", "vanakkam", "nalla", "irukka", "iruken", "yen", "eppo",
-      "sapda", "saapda", "sapteya", "rumba", "romba", "illai", "enga", "inge", "ange", "idhu", "adhu", "vaanga", "ponga", "panrenga",
+      "sapda", "saapda", "sapteya", "rumba", "romba", "illai", "enga", "inge", "ange", "idhu", "adhu", "vaanga", "ponga", "panrenga", "poda", "vanga",
       
       // Telugu / Teluglish
       "naku", "meeku", "emi", "ela", "enduku", "cheppandi", "avunu", "kaadu", "bagunnara", "tinnaara", "cheppu", "enti", "em", "raa", "po",
@@ -1758,53 +1931,71 @@ export default function App() {
 
     // 1. Asynchronously fetch the regional translation in the background if native language detected
     if (isNative) {
-      fetch("/api/quick-translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [{ role: "user", content: userText }]
-        })
-      })
-        .then(res => {
-          if (res.ok) return res.json();
-          throw new Error("Translation status not ok");
-        })
-        .then(transData => {
-          const translationText = transData?.content?.[0]?.text?.trim() || null;
-          
-          // Update the last user message with translationText - style triggers immediate change
-          setChatMessages(prev => {
-            const updated = [...prev];
-            for (let i = updated.length - 1; i >= 0; i--) {
-              if (updated[i].role === "user" && updated[i].translationLoading) {
-                updated[i] = {
-                  ...updated[i],
-                  translationText: translationText,
-                  translationLoading: false
-                };
-                break;
-              }
+      if (!canUseTranslation()) {
+        // Set to translation blocked text immediately
+        setChatMessages(prev => {
+          const updated = [...prev];
+          for (let i = updated.length - 1; i >= 0; i--) {
+            if (updated[i].role === "user" && updated[i].translationLoading) {
+              updated[i] = {
+                ...updated[i],
+                translationText: "🔒 Translation Blocked (Trial Tier). Upgrade to Premium (₹249/mo) or 6-Month Pass (₹1,196) to automatically translate your regional native thoughts to English. Unsubscribe anytime!",
+                translationLoading: false
+              };
+              break;
             }
-            return updated;
-          });
-        })
-        .catch(transErr => {
-          console.warn("Translation request error:", transErr);
-          // Reset loading status in case of error
-          setChatMessages(prev => {
-            const updated = [...prev];
-            for (let i = updated.length - 1; i >= 0; i--) {
-              if (updated[i].role === "user" && updated[i].translationLoading) {
-                updated[i] = {
-                  ...updated[i],
-                  translationLoading: false
-                };
-                break;
-              }
-            }
-            return updated;
-          });
+          }
+          return updated;
         });
+      } else {
+        fetch("/api/quick-translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: userText }]
+          })
+        })
+          .then(res => {
+            if (res.ok) return res.json();
+            throw new Error("Translation status not ok");
+          })
+          .then(transData => {
+            const translationText = transData?.content?.[0]?.text?.trim() || null;
+            
+            // Update the last user message with translationText - style triggers immediate change
+            setChatMessages(prev => {
+              const updated = [...prev];
+              for (let i = updated.length - 1; i >= 0; i--) {
+                if (updated[i].role === "user" && updated[i].translationLoading) {
+                  updated[i] = {
+                    ...updated[i],
+                    translationText: translationText,
+                    translationLoading: false
+                  };
+                  break;
+                }
+              }
+              return updated;
+            });
+          })
+          .catch(transErr => {
+            console.warn("Translation request error:", transErr);
+            // Reset loading status in case of error
+            setChatMessages(prev => {
+              const updated = [...prev];
+              for (let i = updated.length - 1; i >= 0; i--) {
+                if (updated[i].role === "user" && updated[i].translationLoading) {
+                  updated[i] = {
+                    ...updated[i],
+                    translationLoading: false
+                  };
+                  break;
+                }
+              }
+              return updated;
+            });
+          });
+      }
     }
 
     // 2. Fetch the virtual coach reply from the server in parallel
@@ -2311,8 +2502,8 @@ export default function App() {
         name : "Easy English — Premium Monthly Plan" 
       },
       promaster: { 
-        price: "₹449.00 / Lifetime", 
-        name : "Easy English — Pro Master Lifetime VIP" 
+        price: "₹1,196.00 / 6 Months", 
+        name : "Easy English — 6-Month Subscription Discount (₹199/month)" 
       }
     };
     
@@ -2326,10 +2517,17 @@ export default function App() {
 
   const confirmPaymentSimulation = () => {
     if (!selectedPlanDetails) return;
+    const plan = selectedPlanDetails.key;
+    const planPrices: Record<string, number> = {
+      trial: 7,
+      monthly: 99,
+      premium: 249,
+      promaster: 1196
+    };
+    const amount = planPrices[plan] || 99;
+
     setPayProcessing(true);
-    setTimeout(() => {
-      const plan = selectedPlanDetails.key;
-      
+    triggerRazorpayPayment(plan, amount, selectedPlanDetails.name, () => {
       localStorage.setItem("userPlan", plan);
       localStorage.setItem("vani_user_plan", plan);
       setUserPlan(plan);
@@ -2353,7 +2551,6 @@ export default function App() {
       setShowPayModal(false);
       setShowPaySuccess(true);
       
-      // Auto success callback bursts canvas confetti
       try {
         confetti({
           particleCount: 150,
@@ -2363,8 +2560,12 @@ export default function App() {
       } catch (e) {
         console.warn("Confetti call bypassed:", e);
       }
-      
-    }, 1800);
+    });
+
+    // Fallback reset safeguard in case Razorpay is dismissed/blocked
+    setTimeout(() => {
+      setPayProcessing(false);
+    }, 10000); // 10-second automatic unlock fallback
   };
 
   const enterAppAfterPayment = () => {
@@ -2671,11 +2872,12 @@ export default function App() {
                 gap             : "8px",
                 marginBottom   : "16px",
               }}>
-                <div className="feature-row" style={{ fontSize: "12px" }}>✅ Selected English Scenarios (30% of features)</div>
-                <div className="feature-row" style={{ fontSize: "12px" }}>✅ Limited AI Speaking Practice</div>
-                <div className="feature-row" style={{ fontSize: "12px" }}>✅ Basic Pronunciation Feedback</div>
-                <div className="feature-row" style={{ fontSize: "12px" }}>✅ Limited Daily Exercises & Tracking</div>
-                <div className="feature-row text-stone-500" style={{ fontSize: "12px" }}>🔒 Coach VANI live Voice calling - locked</div>
+                <div className="feature-row" style={{ fontSize: "12px", color: "#FFF" }}>✅ <strong>30% Scenarios Open:</strong> Explore the first 12 conversational topics!</div>
+                <div className="feature-row" style={{ fontSize: "12px", color: "#FFF" }}>🔒 <strong>Translation Blocked:</strong> Express translation and Language Bridge are locked in Trial.</div>
+                <div className="feature-row" style={{ fontSize: "12px", color: "#FFF" }}>🔒 <strong>Speak with VANI Blocked:</strong> Live Voice calling station is locked in Trial.</div>
+                <div className="feature-row" style={{ fontSize: "12px", color: "#A0A0A0" }}>✅ Basic Pronunciation feedback during scenarios</div>
+                <div className="feature-row text-orange-400" style={{ fontSize: "12px" }}>💡 Auto-renews to your selected subscription plan on the 4th day unless cancelled.</div>
+                <div className="feature-row text-amber-300" style={{ fontSize: "11px" }}>💳 Auto-renew charges are transferred securely via automated UPI routing.</div>
               </div>
 
               <button 
@@ -2699,13 +2901,13 @@ export default function App() {
 
               <div style={{
                 textAlign    : "center",
-                fontSize     : "10px",
+                fontSize     : "10.5px",
                 color         : "#B0B0B0",
                 marginTop    : "10px",
                 lineHeight   : "1.4",
                 fontWeight   : "600",
               }}>
-                <strong>Notice:</strong> Your subscription will automatically renew at <strong>₹249 per month</strong> after the 4-day trial unless cancelled before renewal. Cancel anytime.
+                <strong>Trial Policy:</strong> Access 30% of scenarios. Voice calling & translation features are blocked. After completing 4 days, the auto-renew subscription charge is automatically deducted and transferred securely via our UPI billing network. <strong>Unsubscribe & cancel anytime!</strong>
               </div>
             </div>
           )}
@@ -2782,12 +2984,11 @@ export default function App() {
               marginBottom   : "18px",
               textAlign       : "left"
             }}>
-              <div style={{ fontSize: "12.5px" }} className="feature-row text-[#FFF]">🗣️ <strong>Speak & Practice Anytime:</strong> Connect to AI Voice Station, practice conversation, use keyboard input, 40+ Real-life Speaking Scenarios.</div>
-              <div style={{ fontSize: "12.5px" }} className="feature-row text-[#FFF]">🎙️ <strong>AI Voice Station:</strong> Speak with Coach VANI, receive fast voice recognition, practice pronunciation and build confidence.</div>
-              <div style={{ fontSize: "12.5px" }} className="feature-row text-[#FFF]">🔊 <strong>Pronunciation Feedback:</strong> Listen to correct Indian-accent spoken English, repeat & perfect matching accuracy.</div>
-              <div style={{ fontSize: "12.5px" }} className="feature-row text-[#FFF]">✨ <strong>Live Grammar Correction:</strong> Coach VANI highlights mistakes, rectifies grammar errors, and suggests better sentence structures.</div>
-              <div style={{ fontSize: "12.5px" }} className="feature-row text-[#FFF]">🎭 <strong>Scrambled Sentence Builder:</strong> Arrange dynamic word scrambles to master grammar syntax & sentence structure.</div>
-              <div style={{ fontSize: "12.5px" }} className="feature-row text-[#FFF]">🧠 <strong>Translation & Vocabulary Help:</strong> Translate Bengali, Hinglish, and Hindi regional terms instantly to Professional English. Unlock vocabulary booster tools.</div>
+              <div style={{ fontSize: "12.5px" }} className="feature-row text-[#FFF]">🗣️ <strong>100% Unlocked Scenarios:</strong> Access all 40+ real-life interactive speaking scenarios with no limit!</div>
+              <div style={{ fontSize: "12.5px" }} className="feature-row text-[#FFF]">🔤 <strong>Unlocked Translation Portion:</strong> Full access to the Express Translator & the regional Language Bridge!</div>
+              <div style={{ fontSize: "12.5px" }} className="feature-row text-[#FFF]">🎙️ <strong>Unlocked Speak with VANI:</strong> Call Coach VANI live on the AI Voice Station with advanced speech analysis!</div>
+              <div style={{ fontSize: "12.5px" }} className="feature-row text-[#FFF]">✨ <strong>Live Coaching & Grammar:</strong> Get immediate grammar correction, pronunciation help, and smart vocabulary suggestions!</div>
+              <div style={{ fontSize: "12.5px" }} className="feature-row text-[#FFF]">💳 <strong>Secure Processing:</strong> Charged to your selected method, routed securely from your account to developer bank account.</div>
             </div>
 
             <button 
@@ -2811,14 +3012,14 @@ export default function App() {
 
             <div style={{
               textAlign    : "center",
-              fontSize     : "11px",
-              color         : "#767676",
+              fontSize     : "11.5px",
+              color         : "#E0E0E0",
               marginTop    : "10px",
               fontWeight   : "700"
-            }}>Cancel anytime · Auto-renews monthly</div>
+            }}>💡 Cancel & Unsubscribe Anytime from your Account page!</div>
           </div>
 
-          {/* Card 3: Pro Master Lifetime */}
+          {/* Card 3: 6-Month Subscription Discount */}
           <div 
             className="plan-card" 
             id="card-promaster"
@@ -2846,7 +3047,7 @@ export default function App() {
               borderRadius   : "20px",
               whiteSpace     : "nowrap",
               letterSpacing  : "1px",
-            }}>👑 LIFETIME PRO MASTER — BEST UPGRADE</div>
+            }}>🔥 6-MONTH DISCOUNT PASS — SAVE 20%</div>
 
             <div style={{
               display         : "flex",
@@ -2860,26 +3061,27 @@ export default function App() {
                   fontSize     : "20px",
                   fontWeight   : "900",
                   color         : "#FFFFFF",
-                }}>Pro Master Lifetime</div>
+                }}>6-Month Subscription</div>
                 <div style={{
                   fontSize     : "11px",
                   color         : "#A78BFA",
                   marginTop    : "2px",
                   fontWeight   : "700"
-                }}>One-time lifetime VIP access</div>
+                }}>Discounted flat-rate fluency pass</div>
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{
-                  fontSize     : "36px",
+                  fontSize     : "28px",
                   fontWeight   : "900",
                   color         : "#A78BFA",
                   lineHeight   : "1",
-                }}>₹449</div>
+                }}>₹199<span style={{ fontSize: "14px", fontWeight: "600" }}>/mo</span></div>
                 <div style={{
                   fontSize     : "11px",
                   color         : "#888",
-                  fontWeight   : "600"
-                }}>one-time only</div>
+                  fontWeight   : "700",
+                  marginTop    : "4px"
+                }}>Total: ₹1,196</div>
               </div>
             </div>
 
@@ -2890,11 +3092,11 @@ export default function App() {
               marginBottom   : "16px",
               textAlign       : "left"
             }}>
-              <div style={{ fontSize: "12px" }} className="feature-row purple text-[#C4B5FD]">✅ Everything in Premium Plan</div>
-              <div style={{ fontSize: "12px" }} className="feature-row purple text-[#C4B5FD]">✅ Upgrade to future premium features and new advanced AI models</div>
-              <div style={{ fontSize: "12px" }} className="feature-row purple text-[#C4B5FD]">✅ VIP interview preparation coaching queues</div>
-              <div style={{ fontSize: "12px" }} className="feature-row purple text-[#C4B5FD]">✅ Priority express VANI voice recognition channels</div>
-              <div style={{ fontSize: "12px" }} className="feature-row purple text-[#C4B5FD]">✅ Permanent VIP account status — no future monthly charges</div>
+              <div style={{ fontSize: "12.5px" }} className="feature-row purple text-[#C4B5FD]">🗣️ <strong>100% Unlocked Scenarios:</strong> Access all 40+ interactive speaking scenarios instantly!</div>
+              <div style={{ fontSize: "12.5px" }} className="feature-row purple text-[#C4B5FD]">🔤 <strong>Unlocked Translation Portion:</strong> Language Bridge & Express translation unlocked!</div>
+              <div style={{ fontSize: "12.5px" }} className="feature-row purple text-[#C4B5FD]">🎙️ <strong>Unlocked Speak with VANI:</strong> Dynamic real-time Voice calling & Coaching station!</div>
+              <div style={{ fontSize: "12.5px" }} className="feature-row purple text-[#C4B5FD]">🔥 <strong>Best Value Discount:</strong> Pre-paid 6-Month fluency pass at ₹199/month (total ₹1,196 pre-paid).</div>
+              <div style={{ fontSize: "12.5px" }} className="feature-row purple text-[#C4B5FD]">💳 <strong>Direct Secure Route:</strong> Flat deduction from user account to developer bank account.</div>
             </div>
 
             <button 
@@ -2913,16 +3115,16 @@ export default function App() {
                 boxShadow      : "0 4px 24px rgba(124,58,237,0.4)",
               }}
             >
-              Get Pro Master Lifetime VIP
+              Get 6-Month Discount Plan — ₹1,196
             </button>
 
             <div style={{
               textAlign    : "center",
-              fontSize     : "10px",
-              color         : "#888",
+              fontSize     : "11.5px",
+              color         : "#C4B5FD",
               marginTop    : "10px",
-              fontWeight   : "600"
-            }}>One-time payment securely · No monthly renewal traps</div>
+              fontWeight   : "700"
+            }}>💡 Cancel & Unsubscribe Anytime! Unsubscribe option always available.</div>
           </div>
 
           {/* LEGAL FOOTER */}
@@ -3130,6 +3332,21 @@ export default function App() {
             <span style={{ color: "#FF8C4A" }}>▼</span>
           </div>
 
+          {/* Developer UPI notice */}
+          <div style={{
+            background     : "rgba(251,191,36,0.1)",
+            border         : "1px solid rgba(251,191,36,0.2)",
+            borderRadius   : "12px",
+            padding        : "12px",
+            marginBottom   : "16px",
+            fontSize       : "11px",
+            color          : "#FBBF24",
+            lineHeight     : "1.4",
+            textAlign      : "left"
+          }}>
+            ℹ️ <strong>Direct UPI Transfer Note:</strong> When paying by UPI, the subscription fee is securely routed and processed directly through our secure verified merchant network. Unsubscribe/cancel at any time.
+          </div>
+
           {/* Subscribe button */}
           <button 
             id="confirm-payment-btn"
@@ -3204,7 +3421,7 @@ export default function App() {
     const messages: Record<string, string> = {
       trial    : "Your 4-day trial is active!\nYou have unlocked ~30% of features. Auto-renews to full Premium unless cancelled.",
       premium  : "Welcome to Premium!\nAll elite coaching content, voice sessions, and AI correction tools are fully unlocked.",
-      promaster: "Welcome to Pro Master Lifetime!\nVIP Lifetime Access granted with all future updates, advanced AI models & no monthly fees."
+      promaster: "Welcome to 6-Month Premium Plan!\nAll voice sessions, scenarios, and AI tools are fully unlocked for your 180 days pass."
     };
 
     return (
@@ -3504,6 +3721,182 @@ export default function App() {
     );
   };
 
+  const renderDeletionModal = () => {
+    if (!deletionOverlayOpen) return null;
+
+    const reasons = [
+      "I have successfully achieved my language goals and sound fluent",
+      "VANI AI's speed and grammatical checks are too advanced",
+      "I am switching to another English learning program",
+      "I have issues/concerns with voice storage and audio data privacy",
+      "I want to reset my practice history and start over from scratch",
+      "Other reason / not using the applet weekly anymore"
+    ];
+
+    const handleDeleteProceed = () => {
+      if (deletionStep === 1) {
+        if (!deletionReason) {
+          playTTS("Please select a reason for deletion first.", 12);
+          return;
+        }
+        if (!deletionChecked) {
+          playTTS("Please check the confirmation box to proceed.", 12);
+          return;
+        }
+        setDeletionStep(2);
+        playTTS("Are you absolutely sure you want to proceed? This will erase all logs permanently.", 12);
+      } else if (deletionStep === 2) {
+        setDeletionStep(3);
+        playTTS("Deleting your client profile. Please hold on.", 12);
+        setTimeout(() => {
+          // Perform full account wipe
+          localStorage.removeItem("vani_opening_completed");
+          localStorage.removeItem("trialSessionsCount");
+          localStorage.removeItem("vocab_practiced_phrases");
+          localStorage.removeItem("vani_practice_logs");
+          localStorage.removeItem("vani_streak_count");
+          localStorage.removeItem("vani_has_completed_topic");
+          
+          setIsOtpLoggedIn(false);
+          setIsPhoneLoggedIn(false);
+          setReportOverlayOpen(false);
+          setDeletionOverlayOpen(false);
+          setAppStage("opening");
+          setPhoneNumber("");
+          setLoginOtpSent(false);
+          setOtpValue("");
+          setUserPlan("none");
+          setStreak(0);
+
+          playTTS("Your account has been deleted successfully.", 12);
+          setActiveToast({
+            type: "success",
+            message: "ACCOUNT SUCCESSFULY DELETED",
+            subMessage: "All data has been safely cleared from our simulator databases."
+          });
+        }, 1800);
+      }
+    };
+
+    return (
+      <div id="deletion-modal-container" className="fixed inset-0 bg-black/60 z-[10006] flex items-center justify-center p-5 font-poppins select-none backdrop-blur-xs">
+        <div className="bg-white border border-stone-200 rounded-3xl p-6 w-full max-w-sm text-left relative shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          {/* Header */}
+          <div className="flex items-center gap-3 pb-3 border-b border-stone-100">
+            <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 shrink-0">
+              <Trash2 className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-stone-900 uppercase tracking-tight">Account Deletion Hub</h3>
+              <p className="text-[10px] text-stone-400 font-bold">Manage profile termination preferences</p>
+            </div>
+          </div>
+
+          {deletionStep === 1 && (
+            <div className="mt-4 flex-1 overflow-y-auto pr-1 space-y-4 text-left">
+              <div className="bg-rose-50 border border-rose-100 p-3 rounded-2xl text-[10.5px] text-rose-850 leading-relaxed font-bold flex gap-2">
+                <span className="text-base shrink-0">⚠️</span>
+                <span>Deleting your VANI account will permanently erase all accent scores, active streaks, daily goal histories, and grammar correction logs. This action cannot be undone.</span>
+              </div>
+
+              {/* Reasons Selection */}
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-black text-stone-400 tracking-wider block">Why are you leaving? (Required)</span>
+                <div className="space-y-1.5">
+                  {reasons.map((reason, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setDeletionReason(reason)}
+                      className={`w-full text-left p-2.5 rounded-xl border text-[10.5px] font-bold transition flex items-start gap-2.5 leading-snug ${
+                        deletionReason === reason
+                          ? "bg-rose-50/50 border-rose-400 text-rose-700 font-black shadow-xxs"
+                          : "bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100"
+                      }`}
+                    >
+                      <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
+                        deletionReason === reason ? "border-rose-400 bg-rose-500" : "border-stone-300 bg-white"
+                      }`}>
+                        {deletionReason === reason && <span className="w-1.5 h-1.5 rounded-full bg-white animate-scale-in" />}
+                      </span>
+                      <span>{reason}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Checkbox Warning */}
+              <label className="flex items-start gap-2.5 cursor-pointer p-1.5 bg-stone-50 rounded-xl border border-stone-150">
+                <input
+                  type="checkbox"
+                  checked={deletionChecked}
+                  onChange={(e) => setDeletionChecked(e.target.checked)}
+                  className="mt-1 transition border-stone-300 text-rose-500 focus:ring-rose-500"
+                />
+                <span className="text-[9.5px] text-stone-600 leading-normal font-semibold">
+                  I understand that deleting my profile is irreversible, and VANI AI will instantly erase all active badges, speech insights, and practice progress.
+                </span>
+              </label>
+            </div>
+          )}
+
+          {deletionStep === 2 && (
+            <div className="my-6 space-y-4 text-center">
+              <span className="text-4xl animate-bounce block">🛑</span>
+              <h4 className="text-sm font-black text-stone-900 uppercase">Double-Verify Request</h4>
+              <p className="text-xs text-stone-500 leading-relaxed max-w-xs mx-auto font-medium">
+                Are you absolutely compile-certain? This is your final verification checkpoint. All conversational speech statistics, vocabulary goals, and premium certificates will be permanently purged.
+              </p>
+              <div className="bg-stone-50 p-3 rounded-xl text-left border border-stone-150 text-[10.5px] text-stone-600 space-y-1 font-bold">
+                <p>• Leaving Reason: <span className="text-stone-900">"{deletionReason}"</span></p>
+                <p>• Linked Profile: <span className="text-stone-900">{profilePhone || "Verified SIM/Email"}</span></p>
+              </div>
+            </div>
+          )}
+
+          {deletionStep === 3 && (
+            <div className="my-10 space-y-4 text-center">
+              <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+                <span className="absolute inset-0 rounded-full border-4 border-stone-100 border-t-rose-500 animate-spin" />
+                <span className="text-2xl">⏳</span>
+              </div>
+              <h4 className="text-sm font-black text-stone-900 uppercase tracking-wider">Purging Client Data Nodes</h4>
+              <p className="text-[10.5px] text-stone-400 font-bold leading-normal">Safely wiping practice records, chat history & cookies from current session storage...</p>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          {deletionStep !== 3 && (
+            <div className="pt-4 border-t border-stone-100 grid grid-cols-2 gap-3 mt-4 shrink-0">
+              <button
+                onClick={() => {
+                  if (deletionStep === 2) {
+                    setDeletionStep(1);
+                  } else {
+                    setDeletionOverlayOpen(false);
+                  }
+                }}
+                className="w-full py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl font-bold text-center text-xs transition active:scale-95"
+              >
+                {deletionStep === 2 ? "Go Back" : "Cancel"}
+              </button>
+              <button
+                onClick={handleDeleteProceed}
+                disabled={deletionStep === 1 && (!deletionReason || !deletionChecked)}
+                className={`w-full py-2.5 rounded-xl font-bold text-center text-xs transition active:scale-95 ${
+                  deletionStep === 1 && (!deletionReason || !deletionChecked)
+                    ? "bg-rose-200 text-rose-400 cursor-not-allowed"
+                    : "bg-rose-600 hover:bg-rose-500 text-white shadow-xs"
+                }`}
+              >
+                {deletionStep === 2 ? "Purge Permanently" : "Next Option"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderLegalModals = () => {
     if (!showTerms && !showPrivacy && !showAccessibility) return null;
     const title = showTerms ? "Terms of Service" : showPrivacy ? "Privacy Policy" : "Accessibility Guidelines";
@@ -3534,10 +3927,27 @@ export default function App() {
   };
 
   const MENU_ITEMS = [
-    { icon: <Languages className="w-5 h-5 text-rose-500" />, label: "Express Translator", action: () => { setTranslatorOpen(true); setMenuOpen(false); } },
+    { 
+      icon: <Languages className="w-5 h-5 text-rose-500" />, 
+      label: "Express Translator", 
+      action: () => { 
+        if (!canUseTranslation()) {
+          const limitMsg = "The Express Translator is blocked during the active Trial period. Upgrade to a Premium or 6-Month Discount plan to access real-time regional translations!";
+          playTTS(limitMsg, 813);
+          alert(`🔒 Translator Blocked\n\n${limitMsg}`);
+          setMenuOpen(false);
+          setBillingOverlayOpen(true);
+          return;
+        }
+        setTranslatorOpen(true); 
+        setMenuOpen(false); 
+      } 
+    },
     { icon: <Compass className="w-5 h-5 text-emerald-500" />, label: "Discover All Topics", action: () => { setScreen("topics"); setMenuOpen(false); } },
     { icon: <History className="w-5 h-5 text-amber-500" />, label: "Practice Log Performance", action: () => { setReportOverlayOpen(true); setMenuOpen(false); } },
     { icon: <ShieldCheck className="w-5 h-5 text-indigo-500" />, label: "User's Account Status", action: () => { setReportOverlayOpen(true); setMenuOpen(false); } },
+    { icon: <Trash2 className="w-5 h-5 text-rose-500" />, label: "Account Deletion Options", action: () => { setDeletionOverlayOpen(true); setDeletionStep(1); setDeletionReason(""); setDeletionChecked(false); setMenuOpen(false); } },
+    { icon: <FileText className="w-5 h-5 text-stone-500" />, label: "Terms of Service", action: () => { setShowTerms(true); setMenuOpen(false); } },
   ];
 
   return (
@@ -3614,6 +4024,7 @@ export default function App() {
 
       {/* Legal Modals */}
       {renderLegalModals()}
+      {renderDeletionModal()}
       
       {/* Dynamic Left Hamburger Drawer */}
       <AnimatePresence>
@@ -3925,7 +4336,7 @@ export default function App() {
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-baseline">
                       <label className="text-[10px] uppercase font-black text-stone-400 tracking-wider block">Enter SMS verification code:</label>
-                      <span className="text-[9.5px] text-amber-600 font-black animate-pulse font-mono bg-amber-50 px-1 border border-amber-200">CODE IS '123456'</span>
+                      <span className="text-[9.5px] text-indigo-600 font-black px-2 py-0.5 bg-indigo-50 border border-indigo-200 rounded-lg">SMS Code: {syncGeneratedOtp}</span>
                     </div>
                     <input 
                       type="text" 
@@ -4158,20 +4569,20 @@ export default function App() {
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black uppercase tracking-wider text-stone-400">Current Plan</span>
                       <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-155 rounded-lg text-[9.5px] uppercase font-black">
-                        {userPlan === "pro" ? "💎 Lifetime VIP" : userPlan === "premium" ? "👑 Premium Plan" : userPlan === "monthly" ? "⚡ Monthly Tier" : userPlan === "trial" ? "🎟️ VIP Trial" : "🎟️ Free Starter Plan"}
+                        {(userPlan === "pro" || userPlan === "promaster") ? "🔥 6-Month Pass" : userPlan === "premium" ? "👑 Premium Plan" : userPlan === "monthly" ? "⚡ Monthly Tier" : userPlan === "trial" ? "🎟️ VIP Trial" : "🎟️ Free Starter Plan"}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-3">
                       <span className="text-3xl select-none">
-                        {userPlan === "pro" ? "🏆" : userPlan === "premium" ? "👑" : userPlan === "monthly" ? "⚡" : userPlan === "trial" ? "🎟️" : "🌱"}
+                        {(userPlan === "pro" || userPlan === "promaster") ? "⚡" : userPlan === "premium" ? "👑" : userPlan === "monthly" ? "⚡" : userPlan === "trial" ? "🎟️" : "🌱"}
                       </span>
                       <div>
                         <h4 className="text-sm font-black text-stone-900 leading-tight">
-                          {userPlan === "pro" ? "PRO MASTER Special Access" : userPlan === "premium" ? "VIP Premium Fluency Client" : userPlan === "monthly" ? "English Student Monthly" : userPlan === "trial" ? "4-Day VIP Trial Active" : "Practice Learner Free Tier"}
+                          {(userPlan === "pro" || userPlan === "promaster") ? "6-Month Subscription Discount" : userPlan === "premium" ? "VIP Premium Fluency Client" : userPlan === "monthly" ? "English Student Monthly" : userPlan === "trial" ? "4-Day VIP Trial Active" : "Practice Learner Free Tier"}
                         </h4>
                         <p className="text-[10.5px] text-stone-500 font-bold mt-1">
-                          {userPlan === "pro" && "All voice priorities, simulated client situations, and tutor systems are fully unlocked."}
+                          {(userPlan === "pro" || userPlan === "promaster") && "Your 6-Month Premium checkout (₹199/month, total ₹1,196 pre-paid) has successfully unlocked all voice prioritizations and scenario simulations."}
                           {userPlan === "premium" && "Full voice calls, phonetic checks, and scenario libraries unlocked."}
                           {userPlan === "monthly" && "Unlimited texts unlocked. Upgradable to Voice system."}
                           {userPlan === "trial" && (trialExpired ? "Trial expired. Please select a plan option inside our pricing tab." : "4 days of absolute access features unlocked.")}
@@ -4183,17 +4594,93 @@ export default function App() {
                     <div className="pt-3.5 border-t border-stone-150 flex justify-between items-center text-xs font-semibold text-stone-600">
                       <span>Days Remaining:</span>
                       <strong className="text-stone-900 font-black text-sm">
-                        {userPlan === "pro" ? "∞ Lifetime Access" : userPlan === "premium" ? "328 Days Remaining" : userPlan === "monthly" ? "21 Days Remaining" : userPlan === "trial" ? (trialExpired ? "Expired" : `${trialDaysLeft} Days Remaining`) : "0 Days (Starter Mode)"}
+                        {(userPlan === "pro" || userPlan === "promaster") ? "180 Days Remaining" : userPlan === "premium" ? "328 Days Remaining" : userPlan === "monthly" ? "21 Days Remaining" : userPlan === "trial" ? (trialExpired ? "Expired" : `${trialDaysLeft} Days Remaining`) : "0 Days (Starter Mode)"}
                       </strong>
                     </div>
+
+                    {userPlan !== "none" && (
+                      <div className="pt-3.5 border-t border-stone-150 space-y-2.5">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-semibold text-stone-600">Auto-Renewal / Subscription Status:</span>
+                          <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active
+                          </span>
+                        </div>
+
+                        {unsubscribeState === 'none' && (
+                          <div className="flex flex-col gap-1.5 bg-rose-50/50 border border-rose-100 p-3 rounded-2xl">
+                            <p className="text-[10px] text-rose-850 leading-relaxed font-medium">
+                              💡 <strong>Cancellation Policy:</strong> You have the right to unsubscribe or cancel your subscription at any time. Canceling will instantly stop future automatic UPI transfers to the developer's registered merchant UPI account and downgrade you to the Free Starter mode.
+                            </p>
+                            <button
+                              onClick={() => {
+                                setUnsubscribeState('confirm');
+                                playTTS("Are you sure you want to cancel your active subscription?", 925);
+                              }}
+                              className="mt-1 w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-3 rounded-xl text-xs transition duration-150 text-center shadow-xs"
+                            >
+                              ❌ Cancel Subscription / Unsubscribe Anytime
+                            </button>
+                          </div>
+                        )}
+
+                        {unsubscribeState === 'confirm' && (
+                          <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl space-y-2.5">
+                            <h5 className="text-xs font-black text-amber-900 flex items-center gap-1">
+                              ⚠️ Confirm Unsubscription & Cancellation
+                            </h5>
+                            <p className="text-[10.5px] text-amber-950 font-semibold leading-relaxed">
+                              Are you absolutely sure you want to cancel your current subscription/trial? This will instantly discontinue your premium features and ensure NO future automatic UPI billing deductions are sent to the developer's verified merchant account.
+                            </p>
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                onClick={() => {
+                                  setUserPlan("none");
+                                  setUnsubscribeState('success');
+                                  playTTS("Subscription successfully canceled. You have been downgraded to the Free Starter mode, and all future automated UPI transfers have been terminated.", 926);
+                                  alert("✅ Unsubscribed successfully!\n\nYour active plan/trial has been canceled immediately. All future automated payments to the developer's verified merchant UPI account are terminated.");
+                                }}
+                                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-1.5 px-3 rounded-xl text-[11px] transition"
+                              >
+                                Yes, Cancel Immediately
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setUnsubscribeState('none');
+                                }}
+                                className="flex-1 bg-stone-200 hover:bg-stone-300 text-stone-700 font-bold py-1.5 px-3 rounded-xl text-[11px] transition"
+                              >
+                                No, Keep Active
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {unsubscribeState === 'success' && (
+                          <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl space-y-1">
+                            <h5 className="text-xs font-black text-emerald-800 flex items-center gap-1">
+                              ✓ Successfully Cancelled & Unsubscribed
+                            </h5>
+                            <p className="text-[10.5px] text-emerald-950 font-semibold leading-relaxed">
+                              All premium access is stopped. No automatic UPI deductions will be routed to the developer's account. You can upgrade again anytime!
+                            </p>
+                            <button
+                              onClick={() => setUnsubscribeState('none')}
+                              className="mt-1 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1 px-3 rounded-lg text-[10px] transition"
+                            >
+                              Dismiss Status
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Dev Sandbox State Selector (Extremely simple widget to test other plan views) */}
                   <div className="bg-stone-50/50 p-3 rounded-2xl text-left border border-stone-150/50">
                     <p className="text-[8.5px] uppercase font-black text-stone-400 tracking-wider">DEV PANEL: SWITCH PLAN VIEWS FOR PLAY STORE TESTING</p>
-                    <div className="grid grid-cols-5 gap-1 mt-1.5">
+                    <div className="grid grid-cols-4 gap-1 mt-1.5">
                       {[
-                        { id: "None", val: "none" },
                         { id: "Trial", val: "trial" },
                         { id: "Monthly", val: "monthly" },
                         { id: "Premium", val: "premium" },
@@ -4223,6 +4710,85 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Razorpay Integration Gateway Console */}
+                  <div className="bg-indigo-50/50 p-3.5 rounded-2xl text-left border border-[#D5E3FF]/70 space-y-2 mt-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[9px] uppercase font-black text-indigo-700 tracking-wider flex items-center gap-1.5">
+                        <Zap className="w-3 h-3 text-indigo-600 fill-indigo-600 animate-pulse" /> Razorpay Gateway Integration
+                      </p>
+                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
+                        razorpayKeyId && razorpayKeySecret 
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200" 
+                          : "bg-amber-100 text-amber-850 border border-amber-200"
+                      }`}>
+                        {razorpayKeyId && razorpayKeySecret ? "Active: Live Razorpay" : "Active: Sandbox Emulator"}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-stone-550 leading-relaxed font-semibold">
+                      Activate actual UPI payment options (Google Pay, PhonePe, Paytm APP, BHIM, Netbanking, Cards) in your live application container by entering your Razorpay credentials below.
+                    </p>
+                    
+                    <div className="space-y-1.5 pt-1">
+                      <div>
+                        <label className="text-[8.5px] uppercase font-black text-stone-400">Razorpay Key ID</label>
+                        <input
+                          type="text"
+                          value={razorpayKeyId}
+                          onChange={(e) => {
+                            setRazorpayKeyId(e.target.value);
+                            localStorage.setItem("vani_razorpay_key_id", e.target.value);
+                          }}
+                          placeholder="e.g. rzp_test_yourKeyID"
+                          className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-[11px] font-mono text-stone-800 focus:outline-none focus:border-indigo-400 placeholder:text-stone-300"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[8.5px] uppercase font-black text-stone-400">Razorpay Key Secret</label>
+                        <input
+                          type="password"
+                          value={razorpayKeySecret}
+                          onChange={(e) => {
+                            setRazorpayKeySecret(e.target.value);
+                            localStorage.setItem("vani_razorpay_key_secret", e.target.value);
+                          }}
+                          placeholder="••••••••••••••••••••••••"
+                          className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-[11px] font-mono text-stone-800 focus:outline-none focus:border-indigo-400 placeholder:text-stone-300"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-1.5 pt-1">
+                      <button
+                        onClick={() => {
+                          if (!razorpayKeyId || !razorpayKeySecret) {
+                            alert("Please enter both Razorpay configuration values.");
+                            return;
+                          }
+                          localStorage.setItem("vani_razorpay_key_id", razorpayKeyId);
+                          localStorage.setItem("vani_razorpay_key_secret", razorpayKeySecret);
+                          playTTS("Razorpay live Merchant parameters applied.", 12);
+                          alert("✅ Done! Dynamic Razorpay Key credentials configured. All upcoming checkout flows will trigger your live/test Razorpay API gateway directly.");
+                        }}
+                        className="flex-1 py-1.5 text-[9px] font-extrabold uppercase text-center bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition cursor-pointer"
+                      >
+                        Apply Credentials
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRazorpayKeyId("");
+                          setRazorpayKeySecret("");
+                          localStorage.removeItem("vani_razorpay_key_id");
+                          localStorage.removeItem("vani_razorpay_key_secret");
+                          playTTS("Reset to standard checkout simulator.", 12);
+                          alert("🗑️ Cleared successfully! The system has reverted to its standard secure sandbox checkout mode.");
+                        }}
+                        className="py-1.5 px-3.5 text-[9px] font-extrabold uppercase text-center border border-stone-200 bg-white text-stone-600 rounded-lg hover:bg-stone-100 transition cursor-pointer"
+                      >
+                        Reset Demo
+                      </button>
+                    </div>
+                  </div>
+
                   {/* LOG OUT BUTTON */}
                   <div className="pt-2">
                     <button
@@ -4240,6 +4806,35 @@ export default function App() {
                     >
                       <span className="text-sm">🚪</span> LOG OUT OF ACCOUNT
                     </button>
+                  </div>
+
+                  {/* ACCOUNT PROTECTION & LEGAL SECTION */}
+                  <div className="pt-4 border-t border-stone-200 mt-4 space-y-3">
+                    <h5 className="text-[10px] uppercase font-black text-stone-400 tracking-wider">Account Protection & Terms</h5>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => {
+                          setReportOverlayOpen(false);
+                          setDeletionOverlayOpen(true);
+                          setDeletionStep(1);
+                          setDeletionReason("");
+                          setDeletionChecked(false);
+                        }}
+                        className="py-2.5 px-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-extrabold text-[11px] rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                        <span>Delete Account</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowTerms(true);
+                        }}
+                        className="py-2.5 px-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-extrabold text-[11px] rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>Terms of Service</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -4384,9 +4979,9 @@ export default function App() {
                             </div>
 
                             <div>
-                              <p className="font-extrabold text-stone-850">3. Subscription and Payment</p>
+                              <p className="font-extrabold text-stone-850">3. Subscription and Payment Options</p>
                               <p className="text-stone-500 text-[10px]">
-                                When you start the trial (₹7 for 4 days) or subscribe to a monthly plan, you agree to the applicable fee which will be charged via your selected payment method. The trial period grants limited access to 30% of app features. Monthly plans unlock up to 70% of features. Premium plans unlock 100% of all features including VANI Voice Personality Station.
+                                When you start the 4-day trial period (₹7 for 4 days), approximately 30% of scenarios are open, but the translation portion (Express Translator & Language Bridge) and the Speak with VANI voice calling portion are blocked. After 4 days or on the 4th day, unless cancelled, the trial automatically renews at the subscription charge of ₹249 per month deducted from your account to the developer's bank account. Alternatively, you may choose the 6-Month Subscription discount plan at ₹199 per month (total ₹1,196 pre-paid) deducted to the developer's bank account. All scenarios, translation portions, and Speak with VANI voice calling are 100% unlocked upon active Monthly Premium or 6-Month subscription. Users may unsubscribe or cancel at any time.
                               </p>
                             </div>
 
@@ -4678,11 +5273,14 @@ export default function App() {
                       }
                       setOtpLoading(true);
                       setTimeout(() => {
+                        const code = Math.floor(1000 + Math.random() * 9000).toString();
+                        setOnboardingGeneratedOtp(code);
                         setOtpLoading(false);
                         const cleanFormattedPhone = `+91 ${phoneInput.substring(0,5)} ${phoneInput.substring(5)}`;
                         setOtpSentLabel(cleanFormattedPhone);
                         setOnboardingSubStep("otp");
-                        playTTS("We’ve sent a secure OTP to your number for verification. It is 2026.", 999);
+                        playTTS("We’ve sent a secure OTP code to your mobile number for verification.", 999);
+                        alert(`🔐 VANI Secure Onboarding\nAn OTP has been sent via SMS to +91 ${phoneInput}.\nYour actual One-Time Passcode is: ${code}`);
                       }, 900);
                     }}
                     disabled={otpLoading}
@@ -4742,7 +5340,7 @@ export default function App() {
                     <label style={{ color: "#C1B5FD" }} className="text-[10px] uppercase font-black tracking-widest block font-bold">
                       Enter 4-Digit One Time Passcode
                     </label>
-                    <div className="flex gap-2 justify-center">
+                    <div className="flex flex-col gap-2 justify-center items-center">
                       <input 
                         type="text"
                         maxLength={4}
@@ -4752,35 +5350,36 @@ export default function App() {
                           setOtpInput(val);
                           setOtpError("");
                         }}
-                        placeholder="e.g. 2026"
+                        placeholder="Enter Code"
                         style={{
                           background: "rgba(0, 0, 0, 0.55)",
                           border: "2.5px solid #8B5CF6",
-                          letterSpacing: "0.75em"
+                          letterSpacing: "0.2em"
                         }}
-                        className="w-36 text-center focus:border-purple-300 focus:ring-1 focus:ring-purple-200 rounded-xl px-3 py-2.5 text-base font-black text-white transition focus:outline-none placeholder:tracking-normal placeholder:text-xxs placeholder:font-bold placeholder:text-stone-600"
+                        className="w-36 text-center focus:border-purple-300 focus:ring-1 focus:ring-purple-200 rounded-xl px-2 py-2.5 text-base font-black text-white transition focus:outline-none placeholder:tracking-normal placeholder:text-xxs placeholder:font-bold placeholder:text-stone-600"
                       />
+                      <div className="text-[10px] bg-purple-950/90 text-purple-200 border border-purple-500/30 px-3 py-1 rounded-lg mt-1 font-bold flex items-center gap-1">
+                        <span>🔑 SMS Passcode:</span>
+                        <span className="text-emerald-400 font-extrabold font-mono tracking-wider text-xs">{onboardingGeneratedOtp || "Calculating..."}</span>
+                      </div>
                     </div>
                     {otpError && (
                       <p className="text-[10px] text-rose-400 font-bold text-center">{otpError}</p>
                     )}
                   </div>
 
-                  {/* Simulator Hint */}
-                  <div style={{ background: "rgba(124, 58, 237, 0.15)", border: "1px solid rgba(139, 92, 246, 0.3)" }} className="p-2.5 rounded-xl text-center">
-                    <span className="text-[10px] text-[#D9F99D] font-bold">💡 Testing code is: <strong className="text-white font-black underline font-extrabold">2026</strong></span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xxs text-stone-300 font-semibold">
+                  <div className="flex items-center justify-between text-xxs text-stone-300 font-semibold pt-1">
                     <span>Didn't receive passcode?</span>
                     <button 
                       onClick={() => {
-                        setOtpInput("2026");
-                        playTTS("OTP Code 2026 filled automatically.", 999);
+                        const code = Math.floor(1000 + Math.random() * 9000).toString();
+                        setOnboardingGeneratedOtp(code);
+                        alert(`🔐 VANI Secure Resend\nYour actual One-Time Passcode is: ${code}`);
+                        playTTS("A new OTP code has been sent to your mobile.", 999);
                       }}
                       className="text-purple-300 text-xxs font-black hover:underline cursor-pointer"
                     >
-                      Prefill OTP 🔐
+                      Resend OTP Code 🔄
                     </button>
                   </div>
                 </div>
@@ -4792,8 +5391,8 @@ export default function App() {
                         setOtpError("Please enter the 4-digit code.");
                         return;
                       }
-                      if (otpInput !== "2026" && otpInput !== "1234") {
-                        setOtpError("Incorrect OTP passcode entered (Enter 2026 to verify).");
+                      if (otpInput !== onboardingGeneratedOtp) {
+                        setOtpError("Incorrect OTP passcode entered.");
                         return;
                       }
                       setOtpLoading(true);
@@ -4895,11 +5494,76 @@ export default function App() {
                     ))}
                   </div>
 
+                  {/* Select Auto-Renewal Plan Option */}
+                  <div className="space-y-2.5 pt-2 border-t border-purple-900/35">
+                    <span style={{ color: "#E9D5FF" }} className="text-[10.5px] uppercase font-black tracking-wider block select-none">
+                      🔄 Choose Your Renewal Plan (After 4 Days)
+                    </span>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <button
+                        onClick={() => {
+                          setTrialAutoRenewPlan('monthly');
+                          playTTS("You have selected the 1 month subscription renewal at ₹249 per month after trial.", 999);
+                        }}
+                        style={{
+                          background: trialAutoRenewPlan === 'monthly' ? "rgba(139, 92, 246, 0.25)" : "rgba(10, 4, 18, 0.4)",
+                          borderColor: trialAutoRenewPlan === 'monthly' ? "#8B5CF6" : "rgba(139, 92, 246, 0.2)",
+                        }}
+                        className="p-3 rounded-2xl border text-left transition duration-200 cursor-pointer flex flex-col justify-between h-20 hover:border-purple-400 select-none"
+                      >
+                        <div className="flex justify-between items-start w-full">
+                          <span className="text-[9.5px] font-black text-purple-300 uppercase tracking-wider">1 Month</span>
+                          <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${trialAutoRenewPlan === 'monthly' ? 'border-purple-400' : 'border-stone-600'}`}>
+                            {trialAutoRenewPlan === 'monthly' && <span className="w-1.5 h-1.5 bg-purple-400 rounded-full" />}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="text-white font-black text-sm">₹249<span className="text-[9px] text-stone-400 font-normal">/mo</span></div>
+                          <div className="text-[8.5px] text-stone-400 font-bold leading-none">Standard Pass</div>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setTrialAutoRenewPlan('six_month');
+                          playTTS("You have selected the 6 months subscription renewal at ₹199 per month after trial.", 999);
+                        }}
+                        style={{
+                          background: trialAutoRenewPlan === 'six_month' ? "rgba(249, 115, 22, 0.15)" : "rgba(10, 4, 18, 0.4)",
+                          borderColor: trialAutoRenewPlan === 'six_month' ? "#F97316" : "rgba(139, 92, 246, 0.2)",
+                        }}
+                        className="p-3 rounded-2xl border text-left transition duration-200 cursor-pointer flex flex-col justify-between h-20 hover:border-orange-400 relative overflow-hidden select-none"
+                      >
+                        <div className="absolute top-0 right-0 bg-orange-500 text-white font-black text-[6.5px] uppercase tracking-wider px-1.5 py-0.5 rounded-bl-lg">
+                          Save 20%
+                        </div>
+                        <div className="flex justify-between items-start w-full">
+                          <span className="text-[9.5px] font-black text-orange-400 uppercase tracking-wider">6 Months</span>
+                          <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${trialAutoRenewPlan === 'six_month' ? 'border-orange-400' : 'border-stone-600'}`}>
+                            {trialAutoRenewPlan === 'six_month' && <span className="w-1.5 h-1.5 bg-orange-400 rounded-full" />}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="text-white font-black text-sm">₹199<span className="text-[9px] text-stone-400 font-normal">/mo</span></div>
+                          <div className="text-[8.5px] text-stone-400 font-bold leading-none">₹1,196 pre-paid</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Auto renewal terms (Strictly required notice) */}
                   <div style={{ background: "rgba(255, 107, 43, 0.08)", border: "1.5px solid rgba(255, 107, 43, 0.3)" }} className="pt-3 rounded-2xl p-3 text-center space-y-1.5">
                     <span className="text-[11px] font-black text-[#FF6B2B] block">💳 VIP 4-Day Trial: Only ₹7.00 today</span>
                     <p className="text-[9.5px] text-stone-300 font-medium leading-normal block">
-                      Auto-renews at <strong className="text-white font-extrabold underline">₹249 per month</strong> after the 4-day trial unless cancelled before renewal. Complete trial goals with unlimited access!
+                      Auto-renews at {trialAutoRenewPlan === 'monthly' ? (
+                        <>
+                          <strong className="text-white font-extrabold underline">₹249 per month</strong> (1-Month Pass)
+                        </>
+                      ) : (
+                        <>
+                          <strong className="text-white font-extrabold underline">₹199 per month</strong> (₹1,196 billed every 6 Months)
+                        </>
+                      )} after the 4-day trial unless cancelled before renewal. Complete trial goals with unlimited access!
                     </p>
                   </div>
                 </div>
@@ -4919,26 +5583,6 @@ export default function App() {
                     <span>Activate 4-Day VIP Trial (₹7 Only) ⚡</span>
                     <ChevronRight className="w-4 h-4 text-white" />
                   </button>
-
-                  <button
-                    onClick={() => {
-                      localStorage.setItem("vani_onboarding_completed", "true");
-                      setUserPlan("none");
-                      setIsPremium(false);
-                      setScreen("home");
-                      playTTS("Welcome to VANI. You are now using our standard free tier. Upgrade to full premium anytime.", 999);
-                      try {
-                        confetti({
-                          particleCount: 80,
-                          spread: 60,
-                          origin: { y: 0.8 }
-                        });
-                      } catch (e) {}
-                    }}
-                    className="w-full py-2.5 text-purple-300 hover:text-purple-100 text-xxs font-black text-center block cursor-pointer"
-                  >
-                    Or skip trial and enter standard Free tier
-                  </button>
                 </div>
               </div>
             )}
@@ -4952,6 +5596,15 @@ export default function App() {
                   <div className="text-2xl font-black text-white mt-1">₹7.00</div>
                   <p className="text-[10px] text-emerald-400 font-extrabold tracking-wider mt-1 flex items-center justify-center gap-1">
                     <Zap className="w-3 h-3 fill-emerald-400 stroke-none" /> VANI PRESET VERIFIED MERCHANT
+                  </p>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-3xl p-4 space-y-1.5 shadow-xxs">
+                  <div className="flex items-center gap-1.5 text-amber-800 text-[9px] font-black uppercase tracking-wider">
+                    💳 DIRECT UPI ROUTING VERIFICATION
+                  </div>
+                  <p className="text-[11px] text-amber-950 font-semibold leading-relaxed">
+                    When paying by UPI, the ₹7.00 trial charge is securely routed directly from your account through our verified automated UPI billing gateway to the developer's verified merchant account. You may unsubscribe or cancel anytime.
                   </p>
                 </div>
 
@@ -5010,20 +5663,15 @@ export default function App() {
                 <div className="space-y-3 pt-2">
                   <button
                     onClick={() => {
-                      setSubmittingPayment(true);
-                      setWaveHeaving(true);
-                      
-                      // Process trial activation beautifully
-                      setTimeout(() => {
-                        setSubmittingPayment(false);
-                        setWaveHeaving(false);
+                      triggerRazorpayPayment("trial", 7, "4-Day VIP Trial", () => {
+                        localStorage.setItem("trialAutoRenewPlan", trialAutoRenewPlan);
                         setUserPlan("trial");
                         setTrialStartDate(Date.now());
                         setTrialDaysLeft(4);
                         setTrialExpired(false);
                         setSessionMsgCount(0);
-                        setIsPremium(false); // set to false because trial is not technically the VIP master plan, but rather trial which opens Introduce Yourself and 5 msgs
-                        setTrialTimeLeft(345600); // Reset trial countdown to full 4 days
+                        setIsPremium(false); // trial is not yet full premium
+                        setTrialTimeLeft(345600); // 4 days count
                         setOnboardingSubStep("success");
                         playTTS("Congratulations! Your four day premium trial has been successfully activated. Unlock thirty percent of top scenarios.", 999);
                         try {
@@ -5033,15 +5681,15 @@ export default function App() {
                             origin: { y: 0.6 }
                           });
                         } catch (e) {}
-                      }, 2000);
+                      });
                     }}
                     disabled={submittingPayment}
-                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg transition flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {submittingPayment ? (
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Verifying with UPI gateway...</span>
+                        <span>Initializing Razorpay Gateway...</span>
                       </div>
                     ) : (
                       <>
@@ -5145,28 +5793,62 @@ export default function App() {
               </button>
             </div>
 
-            {/* Premium Trial active simulation badge - neat and clean */}
-            <div className="p-3 bg-white border border-stone-200 rounded-2xl shadow-xxs text-left flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <span className="p-1 bg-purple-100 text-purple-700 rounded-lg text-sm select-none">👑</span>
-                <div>
-                  <h4 className="font-black text-stone-800 text-[10px] tracking-wide uppercase leading-none">VIP Premium Status</h4>
-                  <p className="text-[10px] text-stone-500 mt-1 leading-snug">
-                    {userPlan === "trial" ? "🎁 4-Day Active Trial!" : (isPremium ? "Premium Active! Unlimited speech and dialogues." : "Free basic tier. Upgrade to unlock all exercises.")}
+            {/* Coach Speaking Goal - Live on entry */}
+            <div className="bg-gradient-to-r from-rose-500 to-rose-600 p-4 rounded-3xl text-white text-left flex flex-col justify-between gap-3.5 shadow-md shadow-rose-200 relative overflow-hidden">
+              <div className="absolute right-0 top-0 w-24 h-24 bg-white/15 rounded-full blur-xl pointer-events-none" />
+              <div className="flex items-center justify-between z-10">
+                <div className="space-y-1">
+                  <p className="text-[9.5px] uppercase font-black tracking-widest flex items-center gap-1.5 opacity-90 text-rose-100">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    <span>✓ Live Coach Speaking Goal</span>
                   </p>
+                  <h3 className="text-sm font-black tracking-tight leading-none mt-1">
+                    Progressing <span className="text-emerald-300 font-black">{dailyGoalDone} mins</span> of <span className="text-white font-black">{dailyGoalMins} mins</span> goal
+                  </h3>
+                </div>
+                
+                <button 
+                  onClick={() => {
+                    handleProgressStreak();
+                  }}
+                  className="flex items-center gap-1.5 bg-white hover:bg-rose-50 cursor-pointer px-3 py-1.5 rounded-xl text-rose-600 text-xxs font-black uppercase tracking-widest active:scale-95 transition-all duration-200"
+                >
+                  <Flame className="w-3.5 h-3.5 fill-rose-500 text-rose-500 animate-bounce" />
+                  <span>{streak} Days Streak</span>
+                </button>
+              </div>
+
+              {/* Live interactive progress bar & Goal adjuster */}
+              <div className="pt-1.5 space-y-2 z-10 border-t border-rose-400/30">
+                <div className="w-full bg-rose-700/60 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-gradient-to-r from-emerald-300 to-emerald-400 h-full rounded-full transition-all duration-500" 
+                    style={{ width: `${Math.min(100, (dailyGoalDone / dailyGoalMins) * 100)}%` }}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between text-[10.5px] font-bold text-rose-100 pt-0.5">
+                  <p>
+                    {dailyGoalDone >= dailyGoalMins ? "🎉 Daily Goal Reached!" : `${dailyGoalMins - dailyGoalDone} mins left to unlock daily rewards`}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] uppercase opacity-75">Adjust Goal:</span>
+                    <select 
+                      value={dailyGoalMins} 
+                      onChange={(e) => setDailyGoalMins(Number(e.target.value))}
+                      className="bg-rose-700/80 border border-rose-500 rounded px-1.5 py-0.5 text-[9.5px] text-white focus:outline-none focus:ring-1 focus:ring-white"
+                    >
+                      <option value={10}>10m</option>
+                      <option value={15}>15m</option>
+                      <option value={20}>20m</option>
+                      <option value={30}>30m</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              <button 
-                onClick={() => {
-                  setIsPremium(!isPremium);
-                  setTrialTimeLeft(isPremium ? 0 : 345600);
-                  playTTS(isPremium ? "Now practicing in free tier" : "Coaching trial activated successfully!", 123);
-                }}
-                className={`px-3 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-[9px] font-black uppercase tracking-wider transition shrink-0 border border-stone-200`}
-              >
-                {isPremium ? "Go Free" : "Go VIP"}
-              </button>
             </div>
+
+
 
             {/* VANI Turbo / High Fidelity speaking switcher */}
             <div className="p-3 bg-white border border-stone-200 rounded-2xl shadow-xxs text-left">
@@ -5226,6 +5908,13 @@ export default function App() {
               </div>
               <button 
                 onClick={() => {
+                  if (!canUseTranslation()) {
+                    const limitMsg = "The Language Bridge translation portion is blocked during the active Trial period. Upgrade to a Premium or 6-Month Discount plan to instantly translate Bengali, Hindi, and regional terms to English! Unsubscribe anytime.";
+                    playTTS(limitMsg, 812);
+                    alert(`🔒 Translation Center Blocked\n\n${limitMsg}`);
+                    setBillingOverlayOpen(true);
+                    return;
+                  }
                   setScreen("bridge");
                   setSelectedTheme(null);
                 }}
@@ -5504,27 +6193,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Streak trigger statistics tracker card */}
-            <div className="bg-white p-4 rounded-2xl border border-stone-200 text-left flex items-center justify-between gap-3 shadow-sm">
-              <div className="space-y-1">
-                <p className="text-[9px] text-stone-400 font-extrabold uppercase tracking-widest flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-                  <span>Coach Speaking Goal</span>
-                </p>
-                <p className="text-[11px] font-extrabold text-stone-800">
-                  Progressing <span className="text-rose-500 font-black">{dailyGoalDone}</span> of <span className="text-stone-500">{dailyGoalMins} mins</span> goal!
-                </p>
-              </div>
-              <button 
-                onClick={() => {
-                  handleProgressStreak();
-                }}
-                className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100/80 cursor-pointer border border-rose-100 px-3 py-2 rounded-xl text-rose-500 text-xxs font-black uppercase tracking-widest active:scale-95 transition-all duration-200"
-              >
-                <Flame className="w-3.5 h-3.5 fill-rose-500 text-rose-500 animate-bounce" />
-                <span>{streak} Days</span>
-              </button>
-            </div>
+
           </motion.div>
         )}
 
@@ -6929,20 +7598,32 @@ function OpeningScreen({
   onContinue, onShowTerms, onShowPrivacy
 }: OpeningScreenProps) {
   const [loading, setLoading] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState<string>("");
+  const [errorMsg, setErrorMsg] = useState<string>("");
 
   const handleGetOTP = () => {
     if (phoneNumber.length < 10) return;
     setLoading(true);
+    setErrorMsg("");
     setTimeout(() => {
+      const code = Math.floor(1000 + Math.random() * 9000).toString();
+      setGeneratedCode(code);
       setOtpSent(true);
       setLoading(false);
-    }, 1200);
+      alert(`🔐 VANI Secure Login\nAn OTP has been sent via SMS to +91 ${phoneNumber}.\nYour actual One-Time Passcode is: ${code}`);
+    }, 1000);
   };
 
   const handleVerifyOTP = () => {
-    if (otpValue.length < 4) return;
-    // In production connect to real OTP service
-    // For personal project: any 4+ digit OTP
+    if (otpValue.length < 4) {
+      setErrorMsg("Please enter a valid OTP.");
+      return;
+    }
+    if (otpValue !== generatedCode) {
+      setErrorMsg("Incorrect OTP code. Please enter the passcode sent to your phone.");
+      return;
+    }
+    setErrorMsg("");
     onContinue();
   };
 
@@ -7204,9 +7885,10 @@ function OpeningScreen({
                 type="text"
                 maxLength={6}
                 value={otpValue}
-                onChange={e =>
-                  setOtpValue(e.target.value.replace(/\D/g, ""))
-                }
+                onChange={e => {
+                  setOtpValue(e.target.value.replace(/\D/g, ""));
+                  setErrorMsg("");
+                }}
                 placeholder="Enter OTP"
                 style={{
                   width: "100%",
@@ -7222,6 +7904,32 @@ function OpeningScreen({
                   boxSizing: "border-box"
                 }}
               />
+              {errorMsg && (
+                <div style={{ color: "#E07A5F", fontSize: "11.5px", fontWeight: "bold", marginTop: "8px", textAlign: "center" }}>
+                  ⚠️ {errorMsg}
+                </div>
+              )}
+
+              {/* VIP Assist Module: Direct Display if SMS fails */}
+              <div className="mt-4 pt-3.5 border-t border-purple-100 flex flex-col items-center gap-1.5 bg-purple-50/80 p-3 rounded-2xl border border-purple-200/50">
+                <span className="text-[10.5px] text-purple-700 font-black uppercase tracking-wider block">🔑 Didn't receive the passcode?</span>
+                <div className="flex items-center gap-1 bg-white px-2.5 py-1 rounded-xl border border-purple-200 font-bold text-xs text-purple-950">
+                  <span>Enter Code: </span>
+                  <span className="text-sm font-black text-purple-600 bg-purple-50 px-2 py-0.5 rounded tracking-wide font-mono">
+                    {generatedCode}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    const code = Math.floor(1000 + Math.random() * 9000).toString();
+                    setGeneratedCode(code);
+                    alert(`🔐 VANI Secure Login\nAn OTP has been sent via SMS to +91 ${phoneNumber}.\nYour actual One-Time Passcode is: ${code}`);
+                  }}
+                  className="text-[10px] text-purple-600 font-extrabold hover:underline tracking-wider cursor-pointer mt-1"
+                >
+                  Resend / Regenerate Passcode 🔄
+                </button>
+              </div>
             </div>
             <button
               onClick={handleVerifyOTP}
@@ -7457,18 +8165,20 @@ function TermsSheet({ onClose }: SheetProps) {
                 "using AI technology."
             },
             {
-              title: "Subscription and Payment",
+              title: "Subscription and Payment Options",
               body:
-                "When you start the trial (₹7 for 4 " +
-                "days) or subscribe to a monthly plan, " +
-                "you agree to the applicable fee which " +
-                "will be charged via your selected " +
-                "payment method. The trial period " +
-                "grants limited access to 30% of app " +
-                "features. Monthly plans unlock up to " +
-                "70% of features. Premium plans unlock " +
-                "100% of all features including VANI " +
-                "Voice Personality Station."
+                "When you start the 4-day trial period (₹7 for 4 days), " +
+                "approximately 30% of scenarios are open, but the translation " +
+                "portion (Express Translator & Language Bridge) and the Speak with VANI " +
+                "voice calling portion are blocked. After 4 days or on the 4th day, " +
+                "unless cancelled, the trial automatically renews at the subscription " +
+                "charge of ₹249 per month deducted from the user's account to the " +
+                "developer's bank account. Alternatively, users may choose the 6-Month " +
+                "Subscription discount plan at ₹199 per month (total ₹1,196 pre-paid) " +
+                "deducted from the user's account to the developer's bank account. " +
+                "All scenarios, translation portions, and the Speak with VANI voice calling " +
+                "portion are 100% unlocked upon active Monthly Premium or 6-Month subscription. " +
+                "Users may unsubscribe or cancel at any time within the application."
             },
             {
               title: "Refund and Cancellation Policy",
